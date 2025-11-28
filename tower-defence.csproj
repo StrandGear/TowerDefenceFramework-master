@@ -46,7 +46,9 @@
     <None Include="AI_TowerDefense\.DS_Store" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AI_TowerDefense\AI_Strategy\AntiJuanStrat.cs" />
     <Compile Include="AI_TowerDefense\AI_Strategy\AbstractStrategy.cs" />
+    <Compile Include="AI_TowerDefense\AI_Strategy\GongiStratIsolated.cs" />
     <Compile Include="AI_TowerDefense\AI_Strategy\MySoldier.cs" />
     <Compile Include="AI_TowerDefense\AI_Strategy\MyStrategy.cs" />
     <Compile Include="AI_TowerDefense\AI_Strategy\RandomStrategy.cs" />

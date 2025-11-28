@@ -47,14 +47,14 @@ namespace AI_TowerDefense
             _lane1 = new PlayerLane();
             _lane2 = new PlayerLane();
             
-            _playerA = new Player("A", _lane1, _lane2);
-            _playerB = new Player("B", _lane2, _lane1);
+            _playerA = new Player("I", _lane1, _lane2);
+            _playerB = new Player("J", _lane2, _lane1);
 
             // here you replace the selected strategy with your strategy class(es).
             // Your strategy should at least be able to beat random!
             
-            _playerAStrategy = new MyStrategy(_playerA);
-            _playerBStrategy = new RandomStrategyLoggerDemo(_playerB);
+            _playerAStrategy = new AntiJuanStrat(_playerA);
+            _playerBStrategy = new GongiStratIsolated(_playerB);
         }
 
         public static TowerDefense Instance => instance ??= new TowerDefense();
@@ -75,7 +75,7 @@ namespace AI_TowerDefense
             string clearSpaces = "                    ";
 
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("Player A");
+            Console.WriteLine("Player I");
             Console.ForegroundColor = defaultColor;
 
             Console.WriteLine("Score: " + _playerA.Score + clearSpaces);
@@ -84,7 +84,7 @@ namespace AI_TowerDefense
             Console.SetCursorPosition(35, 2);
 
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("Player B");
+            Console.WriteLine("Player J");
             Console.ForegroundColor = defaultColor;
 
             Console.SetCursorPosition(35, 3);
