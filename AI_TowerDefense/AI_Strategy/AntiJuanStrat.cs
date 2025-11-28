@@ -9,119 +9,38 @@ namespace AI_Strategy
 {
     public class AntiJuanStrat : AbstractStrategy
     {
-        private const int InitialRounds = 8;
+        private const int InitialRounds = 5;
         private const int SoldierCost = 2;
 
         private int _currentInitialRound = 0;
         private bool _initialPhaseFinished = false;
+        private enum BuildStage { Row4Even, Row4Odd, Row5Even, Row5Odd, Row6Even, Row6Odd, Complete }
+        private BuildStage _stage = BuildStage.Row4Even;
 
-        private enum BuildStage { TwoRowsEven, TwoRowsFillOdds, ThirdRowEven, ThirdRowFillOdds, Complete }
-        private BuildStage _stage = BuildStage.TwoRowsEven;
-
-        private readonly int[] _evenColumns;
-        private readonly int[] _oddColumns;
-        private readonly int[] _targetRows;
+        private readonly int[] _evens;
+        private readonly int[] _odds;
+        private readonly int[] _rows = new int[] { 4, 5, 6 }; 
 
         public AntiJuanStrat(Player player) : base(player)
         {
-            int width = PlayerLane.WIDTH;
-            List<int> evens = new List<int>();
-            List<int> odds = new List<int>();
-            for (int x = 0; x < width; x++)
-            {
-                if (x % 2 == 0) evens.Add(x); else odds.Add(x);
-            }
-            _evenColumns = evens.ToArray();
-            _oddColumns = odds.ToArray();
-            _targetRows = new int[] { 3, 4, 2 };
+            List<int> ev = new List<int>();
+            List<int> od = new List<int>();
+
+            for (int x = 0; x < PlayerLane.WIDTH; x++)
+                if ((x % 2) == 0) ev.Add(x); else od.Add(x);
+
+            _evens = ev.ToArray();
+            _odds = od.ToArray();
         }
+
 
         public override void DeployTowers()
         {
-            if (!_initialPhaseFinished) return;
-
-            int width = PlayerLane.WIDTH;
-            if (_stage == BuildStage.Complete)
-            {
-                ReplaceMissingTowers();
+            if (!_initialPhaseFinished || _stage == BuildStage.Complete)
                 return;
-            }
 
-            ReplaceMissingTowers();
-
-            if (_stage == BuildStage.Complete) return;
-
-            int nextCost = Tower.GetNextTowerCosts(player.HomeLane);
-            if (player.Gold < nextCost) return;
-
-            if (_stage == BuildStage.TwoRowsEven)
-            {
-                for (int r = 0; r < 2; r++)
-                {
-                    int y = _targetRows[r];
-                    foreach (int x in _evenColumns)
-                    {
-                        if (player.HomeLane.GetCellAt(x, y).Unit == null)
-                        {
-                            var res = player.TryBuyTower<Tower>(x, y);
-                            if (res == Player.TowerPlacementResult.NotEnoughGold) return;
-                            AdvanceStageIfNeeded();
-                            return;
-                        }
-                    }
-                }
-                AdvanceStageIfNeeded();
-            }
-            else if (_stage == BuildStage.TwoRowsFillOdds)
-            {
-                for (int r = 0; r < 2; r++)
-                {
-                    int y = _targetRows[r];
-                    foreach (int x in _oddColumns)
-                    {
-                        if (player.HomeLane.GetCellAt(x, y).Unit == null)
-                        {
-                            var res = player.TryBuyTower<Tower>(x, y);
-                            if (res == Player.TowerPlacementResult.NotEnoughGold) return;
-                            AdvanceStageIfNeeded();
-                            return;
-                        }
-                    }
-                }
-                AdvanceStageIfNeeded();
-            }
-            else if (_stage == BuildStage.ThirdRowEven)
-            {
-                int y = _targetRows[2];
-                foreach (int x in _evenColumns)
-                {
-                    if (player.HomeLane.GetCellAt(x, y).Unit == null)
-                    {
-                        var res = player.TryBuyTower<Tower>(x, y);
-                        if (res == Player.TowerPlacementResult.NotEnoughGold) return;
-                        AdvanceStageIfNeeded();
-                        return;
-                    }
-                }
-                AdvanceStageIfNeeded();
-            }
-            else if (_stage == BuildStage.ThirdRowFillOdds)
-            {
-                int y = _targetRows[2];
-                foreach (int x in _oddColumns)
-                {
-                    if (player.HomeLane.GetCellAt(x, y).Unit == null)
-                    {
-                        var res = player.TryBuyTower<Tower>(x, y);
-                        if (res == Player.TowerPlacementResult.NotEnoughGold) return;
-                        AdvanceStageIfNeeded();
-                        return;
-                    }
-                }
-                AdvanceStageIfNeeded();
-            }
+            TryFillStage();
         }
-
         public override void DeploySoldiers()
         {
             int width = PlayerLane.WIDTH;
@@ -130,34 +49,47 @@ namespace AI_Strategy
             {
                 if (player.Gold < SoldierCost) return;
 
-                for (int x = 0; x < width; x++)
-                {
-                    if (player.Gold < SoldierCost) break;
-                    if (player.EnemyLane.GetCellAt(x, 0).Unit == null)
-                    {
-                        player.TryBuySoldier<MySoldier>(x);
-                    }
-                }
+                for (int x = 0; x < width && player.Gold >= SoldierCost; x++)
+                    player.TryBuySoldier<MySoldier>(x);
 
                 _currentInitialRound++;
-                if (_currentInitialRound >= InitialRounds) _initialPhaseFinished = true;
+                if (_currentInitialRound >= InitialRounds)
+                    _initialPhaseFinished = true;
+
                 return;
             }
 
-            if (_stage != BuildStage.Complete)
-            {
-                return;
-            }
+            if (_stage != BuildStage.Complete) return;
 
-            if (player.Gold < SoldierCost) return;
-            for (int x = 0; x < width; x++)
+            for (int x = 0; x < width && player.Gold >= SoldierCost; x++)
+                player.TryBuySoldier<MySoldier>(x);
+        }
+
+
+        private void TryFillStage()
+        {
+            int rowIndex = (int)_stage / 2;
+            bool useEven = ((int)_stage % 2 == 0);
+
+            int y = _rows[rowIndex];
+            int[] cols = useEven ? _evens : _odds;
+
+            int cost = Tower.GetNextTowerCosts(player.HomeLane);
+            if (player.Gold < cost) return;
+
+            foreach (int x in cols)
             {
-                if (player.Gold < SoldierCost) break;
-                if (player.EnemyLane.GetCellAt(x, 0).Unit == null)
+                if (player.HomeLane.GetCellAt(x, y).Unit == null)
                 {
-                    player.TryBuySoldier<MySoldier>(x);
+                    var res = player.TryBuyTower<Tower>(x, y);
+                    if (res == Player.TowerPlacementResult.NotEnoughGold) return;
+                    return;
                 }
             }
+
+            _stage++;
+            if (_stage > BuildStage.Row6Odd)
+                _stage = BuildStage.Complete;
         }
 
         public override List<Soldier> SortedSoldierArray(List<Soldier> unsortedList)
@@ -171,75 +103,5 @@ namespace AI_Strategy
             unsortedList.Sort((a, b) => a.Health.CompareTo(b.Health));
             return unsortedList;
         }
-
-        private void ReplaceMissingTowers()
-        {
-            int width = PlayerLane.WIDTH;
-            foreach (int y in _targetRows)
-            {
-                for (int x = 0; x < width; x++)
-                {
-                    if (player.HomeLane.GetCellAt(x, y).Unit == null)
-                    {
-                        int nextCost = Tower.GetNextTowerCosts(player.HomeLane);
-                        if (player.Gold < nextCost) return;
-                        var res = player.TryBuyTower<Tower>(x, y);
-                        if (res == Player.TowerPlacementResult.NotEnoughGold) return;
-                        return;
-                    }
-                }
-            }
-        }
-
-        private void AdvanceStageIfNeeded()
-        {
-            if (_stage == BuildStage.TwoRowsEven)
-            {
-                bool done = true;
-                for (int r = 0; r < 2 && done; r++)
-                {
-                    int y = _targetRows[r];
-                    foreach (int x in _evenColumns)
-                    {
-                        if (player.HomeLane.GetCellAt(x, y).Unit == null) { done = false; break; }
-                    }
-                }
-                if (done) _stage = BuildStage.TwoRowsFillOdds;
-            }
-            if (_stage == BuildStage.TwoRowsFillOdds)
-            {
-                bool done = true;
-                for (int r = 0; r < 2 && done; r++)
-                {
-                    int y = _targetRows[r];
-                    foreach (int x in _oddColumns)
-                    {
-                        if (player.HomeLane.GetCellAt(x, y).Unit == null) { done = false; break; }
-                    }
-                }
-                if (done) _stage = BuildStage.ThirdRowEven;
-            }
-            if (_stage == BuildStage.ThirdRowEven)
-            {
-                int y = _targetRows[2];
-                bool done = true;
-                foreach (int x in _evenColumns)
-                {
-                    if (player.HomeLane.GetCellAt(x, y).Unit == null) { done = false; break; }
-                }
-                if (done) _stage = BuildStage.ThirdRowFillOdds;
-            }
-            if (_stage == BuildStage.ThirdRowFillOdds)
-            {
-                int y = _targetRows[2];
-                bool done = true;
-                foreach (int x in _oddColumns)
-                {
-                    if (player.HomeLane.GetCellAt(x, y).Unit == null) { done = false; break; }
-                }
-                if (done) _stage = BuildStage.Complete;
-            }
-        }
     }
 }
-
